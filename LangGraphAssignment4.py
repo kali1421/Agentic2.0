@@ -16,6 +16,8 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 from langchain.output_parsers import PydanticOutputParser
 
+from langchain_community.tools import DuckDuckGoSearchRun
+
 from langgraph.graph import StateGraph,END
 
 
@@ -78,8 +80,14 @@ def function_supervisor(state: AgentState):
     question=state["messages"][-1]
     print("Question",question)
     template="""
-    Your task is to classify the given user query into one of the following categories: [Maruthi Suzuki,Not Related].
-    Only respond with the category name and nothing else.
+    Classify the following user query into one of the categories: [Current, Maruthi Suzuki, Not Related].
+
+    Rules:
+    - If the query contains keywords like "current", "latest", or "new", classify it as **Current**.
+    - If the query is about Maruthi Suzuki or any of its cars, classify it as **Maruthi Suzuki**.
+    - If it does not fall into the above, classify it as **Not Related**.
+
+    Only respond with one of the following: Current, Maruthi Suzuki, Not Related.
 
     User query: {question}
     {format_instructions}
@@ -128,20 +136,9 @@ def rag_function(state: AgentState):
 # create a function for web crawling
 def web_crawler(state: AgentState):
     print("-> Web Crawler Call ->")
-    
     question = state["messages"][0]
-    
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", "You are a helpful web crawler that searches the web for information."),
-            ("human", "Search the web for information related to: {question}"),
-        ]
-    )
-    
-    chain = prompt | model | StrOutputParser()
-    
-    result = chain.invoke({"question": question})
-    
+    search = DuckDuckGoSearchRun()
+    result = search.invoke({"query": question})
     return {"messages": [result]}
 
 
@@ -208,7 +205,7 @@ workflow1.add_conditional_edges(
 # Run the workflow
 if __name__ == "__main__":
     # Example input
-    input_data = {"messages": ["What are the latest car models available of Maruthi Suzuki?"]}
+    input_data = {"messages": ["How are you feeling today?"]}
     app = workflow1.compile()
     # Run the workflow
     result = app.invoke(input_data)
